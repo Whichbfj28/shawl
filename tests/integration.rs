@@ -200,7 +200,7 @@ speculate::speculate! {
             delete_log();
 
             let target_dir = format!("{}\\target", env!("CARGO_MANIFEST_DIR"));
-            run_shawl(&["add", "--name", "shawl", "--cwd", &target_dir, "--", "debug/shawl-child.exe"]);
+            run_shawl(&["add", "--name", "shawl", "--cwd", &target_dir, "--", "debug\\shawl-child.exe"]);
             run_cmd(&["sc", "start", "shawl"]);
             run_cmd(&["sc", "stop", "shawl"]);
 
