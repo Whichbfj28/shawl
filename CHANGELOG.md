@@ -2,6 +2,7 @@
 
 * Added `--log-dir`.
   (Contributed by [oscarbailey-tc](https://github.com/mtkennerly/shawl/pull/19))
+*
 * When a custom `--cwd` is set, automatically add it to the command's PATH
   so that commands written as relative paths can be resolved.
 

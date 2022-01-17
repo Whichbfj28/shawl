@@ -196,7 +196,7 @@ speculate::speculate! {
             assert!(log.contains("stdout: \"shawl-child test option received\""));
         }
 
-        it "passes --cwd into the command PATH" {
+        it "can resolve relative commands with a --cwd" {
             delete_log();
 
             let target_dir = format!("{}\\target", env!("CARGO_MANIFEST_DIR"));
@@ -206,11 +206,12 @@ speculate::speculate! {
 
             let log = std::fs::read_to_string(log_file()).unwrap();
             // Example log content, without escaping: "PATH: C:\tmp;\\?\C:\git\shawl\target"
-            let pattern = regex::Regex::new(
-                &format!(r#"PATH: .+;\\\\\\\\\?\\\\{}"#, &target_dir.replace("\\", "\\\\\\\\"))
-            ).unwrap();
+            // let pattern = regex::Regex::new(
+            //     &format!(r#"PATH: .+;\\\\\\\\\?\\\\{}"#, &target_dir.replace("\\", "\\\\\\\\"))
+            // ).unwrap();
             println!("{}", &log);
-            assert!(pattern.is_match(&log));
+            // assert!(pattern.is_match(&log));
+            assert!(log.contains("stdout: \"shawl-child message on stdout\""));
         }
     }
 }

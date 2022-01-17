@@ -365,6 +365,29 @@ mod service {
 
     define_windows_service!(ffi_service_main, service_main);
 
+    fn configure_command(
+        command: &mut std::process::Command,
+        args: &[std::ffi::OsString],
+        should_log_cmd: bool,
+        cwd: &Option<String>,
+    ) {
+        command
+            .args(&*args)
+            .stdout(if should_log_cmd {
+                std::process::Stdio::piped()
+            } else {
+                std::process::Stdio::null()
+            })
+            .stderr(if should_log_cmd {
+                std::process::Stdio::piped()
+            } else {
+                std::process::Stdio::null()
+            });
+        if let Some(active_cwd) = &cwd {
+            command.current_dir(active_cwd);
+        }
+    }
+
     pub fn run(name: String) -> windows_service::Result<()> {
         service_dispatcher::start(name, ffi_service_main)
     }
@@ -457,40 +480,73 @@ mod service {
             info!("Launching command");
             let should_log_cmd = !&opts.no_log_cmd;
             let mut child_cmd = std::process::Command::new(&program);
+            configure_command(&mut child_cmd, &args, should_log_cmd, &cwd);
 
-            child_cmd
-                .args(&args)
-                .stdout(if should_log_cmd {
-                    std::process::Stdio::piped()
-                } else {
-                    std::process::Stdio::null()
-                })
-                .stderr(if should_log_cmd {
-                    std::process::Stdio::piped()
-                } else {
-                    std::process::Stdio::null()
-                });
-            if let Some(active_cwd) = &cwd {
-                child_cmd.current_dir(active_cwd);
-                child_cmd.env(
-                    "PATH",
-                    match std::env::var("PATH") {
-                        Ok(path) => format!("{};{}", path, active_cwd),
-                        Err(_) => active_cwd.to_string(),
-                    },
-                );
-            }
+            // child_cmd
+            //     .args(&args)
+            //     .stdout(if should_log_cmd {
+            //         std::process::Stdio::piped()
+            //     } else {
+            //         std::process::Stdio::null()
+            //     })
+            //     .stderr(if should_log_cmd {
+            //         std::process::Stdio::piped()
+            //     } else {
+            //         std::process::Stdio::null()
+            //     });
+            // if let Some(active_cwd) = &cwd {
+            //     child_cmd.current_dir(active_cwd);
+            //     child_cmd.env(
+            //         "PATH",
+            //         match std::env::var("PATH") {
+            //             Ok(path) => format!("{};{}", path, active_cwd),
+            //             Err(_) => active_cwd.to_string(),
+            //         },
+            //     );
+            // }
             let mut child = match child_cmd.spawn() {
                 Ok(c) => c,
                 Err(e) => {
-                    error!("Unable to launch command: {}", e);
-                    service_exit_code = match e.raw_os_error() {
-                        Some(win_code) => ServiceExitCode::Win32(win_code as u32),
-                        None => {
-                            ServiceExitCode::Win32(winapi::shared::winerror::ERROR_PROCESS_ABORTED)
+                    if let Some(active_cwd) = &cwd {
+                        if e.kind() == std::io::ErrorKind::NotFound {
+                            error!("?????????? {}\\{}", &active_cwd, &program);
+                            child_cmd = std::process::Command::new(
+                                format!("{}\\{}", &active_cwd, &program).replace("\\\\?\\", ""),
+                            );
+                            configure_command(&mut child_cmd, &args, should_log_cmd, &cwd);
+                            match child_cmd.spawn() {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    error!("Unable to launch command 1: {}", e);
+                                    service_exit_code = match e.raw_os_error() {
+                                        Some(win_code) => ServiceExitCode::Win32(win_code as u32),
+                                        None => ServiceExitCode::Win32(
+                                            winapi::shared::winerror::ERROR_PROCESS_ABORTED,
+                                        ),
+                                    };
+                                    break;
+                                }
+                            }
+                        } else {
+                            error!("Unable to launch command 2: {}", e);
+                            service_exit_code = match e.raw_os_error() {
+                                Some(win_code) => ServiceExitCode::Win32(win_code as u32),
+                                None => ServiceExitCode::Win32(
+                                    winapi::shared::winerror::ERROR_PROCESS_ABORTED,
+                                ),
+                            };
+                            break;
                         }
-                    };
-                    break;
+                    } else {
+                        error!("Unable to launch command 3: {}", e);
+                        service_exit_code = match e.raw_os_error() {
+                            Some(win_code) => ServiceExitCode::Win32(win_code as u32),
+                            None => ServiceExitCode::Win32(
+                                winapi::shared::winerror::ERROR_PROCESS_ABORTED,
+                            ),
+                        };
+                        break;
+                    }
                 }
             };
 
