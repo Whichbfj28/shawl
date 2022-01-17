@@ -446,6 +446,7 @@ mod service {
 
         let mut command = opts.command.into_iter();
         let program = command.next().unwrap();
+        println!("--------------- program: {}", &program);
         let mut args: Vec<_> = command.map(std::ffi::OsString::from).collect();
         if opts.pass_start_args {
             args.extend(start_arguments);
